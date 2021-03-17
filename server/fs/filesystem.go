@@ -80,6 +80,7 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			return admin.Overview{Entries: entries}, nil
 		}
 	}
+	//Else return file
 	log.Println(ctx.Value("userID"))
 	return File{}, nil
 }

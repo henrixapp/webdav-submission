@@ -1,12 +1,23 @@
 package admin
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"io/fs"
+	"log"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/henrixapp/webdav-submission/server/db"
+	"github.com/minio/minio-go/v7"
 )
+
+//TODO(henrik): Size limits!
+//only one bucket for all TODO(henrik): Where to split?
+const bucketName = "mybucket"
 
 //Submission is the handin of a group of Students, visible in the Filesystem
 type Submission struct {
@@ -38,4 +49,147 @@ type Invitation struct {
 	InvitedUserID  int
 	InvitingUserID int
 	SubmissionID   uuid.UUID
+}
+
+//SubmissionsFileInfo mimics a solution/submission part
+//Implements a FileInfo
+type SubmissionsFileInfo struct {
+	db.BaseObject
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Name_     string
+	//IsSolution marks that an object is editable by tutor
+	IsSolution bool
+	//IsVisible determines whether file is readable
+	IsVisible    bool
+	LastEditedBy int
+	minioClient  *minio.Client
+	buffer       *fileBuffer
+}
+type SubmissionsFile struct {
+	SubmissionID uuid.UUID
+	SubmissionsFileInfo
+}
+
+func (submissionsFile SubmissionsFile) Readdir(count int) ([]fs.FileInfo, error) {
+	res := make([]fs.FileInfo, 0)
+	return res, nil
+}
+func (submissionsFile SubmissionsFile) Stat() (fs.FileInfo, error) {
+	return submissionsFile.SubmissionsFileInfo, nil
+}
+func (submissionsFile SubmissionsFile) Close() error {
+	submissionsFile.buffer.pos = 0
+	submissionsFile.minioClient.PutObject(context.Background(), bucketName, submissionsFile.ID.String(), submissionsFile.buffer, int64(len(submissionsFile.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	return nil
+}
+
+func (submissionsFile SubmissionsFile) Read(p []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (submissionsFile SubmissionsFile) Seek(offset int64, whence int) (int64, error) {
+	return submissionsFile.buffer.Seek(offset, whence)
+}
+func (submissionsFile SubmissionsFile) Write(p []byte) (n int, err error) {
+	//TODO(henrik): IF dir is supported later on... restrict it here
+	return submissionsFile.buffer.Write(p)
+}
+
+func (t SubmissionsFileInfo) IsDir() bool {
+	return false
+}
+
+func (t SubmissionsFileInfo) ModTime() time.Time {
+	return t.UpdatedAt
+}
+
+func (t SubmissionsFileInfo) Name() string {
+	return t.Name_
+}
+
+func (t SubmissionsFileInfo) Mode() fs.FileMode {
+	//TODO(henrik): Implement write protection here
+	return 0644
+}
+func (t SubmissionsFileInfo) Size() int64 {
+	objInfo, err := t.minioClient.StatObject(context.Background(), bucketName, t.ID.String(), minio.StatObjectOptions{})
+	if err != nil {
+		log.Println(err)
+		return 0
+	}
+	return objInfo.Size
+}
+
+func (t SubmissionsFileInfo) Sys() interface{} {
+	return nil
+}
+
+type fileBuffer struct {
+	pos  int
+	data []byte
+	mu   sync.Mutex
+}
+
+func (fb *fileBuffer) Write(p []byte) (n int, err error) {
+	lenp := len(p)
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+
+	if fb.pos < len(fb.data) {
+		n := copy(fb.data[fb.pos:], p)
+		fb.pos += n
+		p = p[n:]
+	} else if fb.pos > len(fb.data) {
+		if fb.pos <= cap(fb.data) {
+			oldLen := len(fb.data)
+			fb.data = fb.data[:fb.pos]
+			hole := fb.data[oldLen:]
+			for i := range hole {
+				hole[i] = 0
+			}
+		} else {
+			d := make([]byte, fb.pos, fb.pos+len(p))
+			copy(d, fb.data)
+			fb.data = d
+		}
+	}
+
+	if len(p) > 0 {
+		fb.data = append(fb.data, p...)
+		fb.pos = len(fb.data)
+	}
+	return lenp, nil
+}
+
+func (f *fileBuffer) Read(p []byte) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.pos >= len(f.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, f.data[f.pos:])
+	f.pos += n
+	return n, nil
+}
+
+func (f *fileBuffer) Seek(offset int64, whence int) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	npos := f.pos
+	switch whence {
+	case os.SEEK_SET:
+		npos = int(offset)
+	case os.SEEK_CUR:
+		npos += int(offset)
+	case os.SEEK_END:
+		npos = len(f.data) + int(offset)
+	default:
+		npos = -1
+	}
+	if npos < 0 {
+		return 0, os.ErrInvalid
+	}
+	f.pos = npos
+	return int64(f.pos), nil
 }
