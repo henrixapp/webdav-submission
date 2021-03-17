@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	pb "github.com/henrixapp/mampf-rpc/grpc"
 	"github.com/henrixapp/webdav-submission/server/admin"
 	"github.com/henrixapp/webdav-submission/server/auth"
@@ -37,6 +38,20 @@ func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, co
 	})
 	if err != nil {
 		log.Fatalln(err)
+	}
+	bucketName := "mybucket"
+	err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
+	if err != nil {
+		log.Println(err)
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, errBucketExists := minioClient.BucketExists(context.Background(), bucketName)
+		if errBucketExists == nil && exists {
+			log.Printf("We already own %s\n", bucketName)
+		} else {
+			log.Fatalln("NOPE", err)
+		}
+	} else {
+		log.Printf("Successfully created %s\n", bucketName)
 	}
 	return SharedWebDavFS{minioClient: minioClient, mampfClient: auth.MaMpfClientImpl{}, mampfTermsClient: pb.NewMaMpfTermServiceClient(conn),
 		mampfLectureServiceClient: pb.NewMaMpfLectureServiceClient(conn),
@@ -80,7 +95,36 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			return admin.Overview{Entries: entries}, nil
 		}
 	}
+	if len(path) == 5 && path[3] != "" && path[4] == "" {
+		//overview over one submission
+		if strings.LastIndex(path[3], "$") != -1 {
+			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
+			s, _ := uuid.Parse(submissionId)
+			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
+			//FIXME(henrik): Permission check
+			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
+
+			return admin.Submission{SubmissionsFiles: submissionsFiles}, nil
+		}
+	}
 	//Else return file
+	if len(path) == 5 && path[3] != "" && path[4] != "" {
+		//overview over one submission
+		if strings.LastIndex(path[3], "$") != -1 {
+			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
+			s, _ := uuid.Parse(submissionId)
+			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
+			//FIXME(henrik): Permission check
+			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
+			for _, v := range submissionsFiles {
+				if v.Name_ == path[4] {
+					return v, nil
+				}
+			}
+			//NOT FOUND --> Create file
+			return swdfs.submissionRepository.CreateSubmissionsFile(s, path[4], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+		}
+	}
 	log.Println(ctx.Value("userID"))
 	return File{}, nil
 }

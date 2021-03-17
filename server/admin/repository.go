@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
 	"gorm.io/gorm"
 )
 
@@ -32,6 +33,9 @@ type SubmissionRepository interface {
 	FindSubmissionBySubmitterIDAndAssignmentID(submitterID int, assignmentID uuid.UUID) (Submission, error)
 	SaveInviteToSubmission(invite Invitation) error
 	AcceptInvitation(invite Invitation) error
+
+	FindSubmissionsFilesBySubmissionID(uuid uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error)
+	CreateSubmissionsFile(uuid uuid.UUID, name string, user int, mC *minio.Client) (SubmissionsFile, error)
 }
 
 type SubmissionRepositoryGorm struct {
@@ -45,7 +49,7 @@ func NewSubmissionRepositoryGorm(db *gorm.DB) SubmissionRepository {
 	db.AutoMigrate(&Submission{})
 	db.AutoMigrate(&Submitter{})
 	db.AutoMigrate(&Invitation{})
-
+	db.AutoMigrate(&SubmissionsFile{})
 	return SubmissionRepositoryGorm{db: db}
 }
 
@@ -155,4 +159,27 @@ func (srg SubmissionRepositoryGorm) FindSubmissionsByLectureIDAndTutorialID(lect
 func (srg SubmissionRepositoryGorm) CreateTutor(tutor Tutor) error {
 	srg.db.Create(&tutor)
 	return nil
+}
+
+func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissionID uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error) {
+	var submissionsFiles []SubmissionsFile
+	srg.db.Where("submission_id = ?", submissionID).Find(&submissionsFiles)
+	for s := range submissionsFiles {
+		submissionsFiles[s].minioClient = mC
+		submissionsFiles[s].get()
+	}
+	return submissionsFiles, nil
+}
+
+func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UUID, name string, user int, mC *minio.Client) (SubmissionsFile, error) {
+	subFI := SubmissionsFile{}
+	subFI.buffer = &fileBuffer{}
+	subFI.minioClient = mC
+	subFI.SubmissionID = submissionUUID
+	subFI.LastEditedBy = user
+	subFI.Name_ = name
+	subFI.IsSolution = false
+	subFI.IsVisible = true //TODO(henrik): Fixme
+	srg.db.Create(&subFI)
+	return subFI, nil
 }

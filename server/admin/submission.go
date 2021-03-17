@@ -31,10 +31,12 @@ type Submission struct {
 	Accepted                 bool
 
 	db.BaseObject
+
+	SubmissionsFiles []SubmissionsFile
 }
 
 func (s Submission) NameWithId() string {
-	return fmt.Sprint(s.Assignment.Title, "-", s.ID)
+	return fmt.Sprint(s.Assignment.Title, "$", s.ID)
 }
 
 //Submitter is the permission to upload to a submission
@@ -84,8 +86,9 @@ func (submissionsFile SubmissionsFile) Close() error {
 	return nil
 }
 
+//TODO(henrik): init filemust open file
 func (submissionsFile SubmissionsFile) Read(p []byte) (n int, err error) {
-	return 0, nil
+	return submissionsFile.Read(p)
 }
 
 func (submissionsFile SubmissionsFile) Seek(offset int64, whence int) (int64, error) {
@@ -192,4 +195,41 @@ func (f *fileBuffer) Seek(offset int64, whence int) (int64, error) {
 	}
 	f.pos = npos
 	return int64(f.pos), nil
+}
+
+func (o Submission) Readdir(count int) ([]fs.FileInfo, error) {
+	res := make([]fs.FileInfo, len(o.SubmissionsFiles))
+	for i := range o.SubmissionsFiles {
+		res[i] = o.SubmissionsFiles[i]
+	}
+	return res, nil
+}
+func (o Submission) Stat() (fs.FileInfo, error) {
+	return DirInfo{}, nil
+}
+func (o Submission) Close() error {
+	return nil
+}
+
+func (o Submission) Read(p []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (o Submission) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
+}
+func (o Submission) Write(p []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (sf SubmissionsFile) get() {
+	object, err := sf.minioClient.GetObject(context.Background(), bucketName, sf.ID.String(), minio.GetObjectOptions{})
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	if _, err = io.Copy(sf.buffer, object); err != nil {
+		fmt.Println(err)
+		return
+	}
 }
