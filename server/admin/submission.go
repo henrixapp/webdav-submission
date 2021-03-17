@@ -7,6 +7,7 @@ import (
 	"github.com/henrixapp/webdav-submission/server/db"
 )
 
+//Submission is the handin of a group of Students
 type Submission struct {
 	AssignmentID             uuid.UUID
 	Assignment               Assignment `gorm:"foreignKey:AssignmentID"`
