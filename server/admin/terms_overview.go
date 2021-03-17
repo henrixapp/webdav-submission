@@ -22,6 +22,12 @@ type LecturesOverview struct {
 type DirInfo struct {
 	Name_ string
 }
+type Entry interface {
+	NameWithId() string
+}
+type Overview struct {
+	Entries []Entry
+}
 
 func (termsO TermsOverview) Readdir(count int) ([]fs.FileInfo, error) {
 	res := make([]fs.FileInfo, len(termsO.Terms))
@@ -95,5 +101,30 @@ func (lecturesO LecturesOverview) Seek(offset int64, whence int) (int64, error) 
 	return 0, nil
 }
 func (lecturesO LecturesOverview) Write(p []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (o Overview) Readdir(count int) ([]fs.FileInfo, error) {
+	res := make([]fs.FileInfo, len(o.Entries))
+	for i := range o.Entries {
+		res[i] = DirInfo{Name_: o.Entries[i].NameWithId()}
+	}
+	return res, nil
+}
+func (o Overview) Stat() (fs.FileInfo, error) {
+	return DirInfo{}, nil
+}
+func (o Overview) Close() error {
+	return nil
+}
+
+func (o Overview) Read(p []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (o Overview) Seek(offset int64, whence int) (int64, error) {
+	return 0, nil
+}
+func (o Overview) Write(p []byte) (n int, err error) {
 	return 0, nil
 }

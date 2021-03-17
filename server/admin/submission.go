@@ -1,13 +1,14 @@
 package admin
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/henrixapp/webdav-submission/server/db"
 )
 
-//Submission is the handin of a group of Students
+//Submission is the handin of a group of Students, visible in the Filesystem
 type Submission struct {
 	AssignmentID             uuid.UUID
 	Assignment               Assignment `gorm:"foreignKey:AssignmentID"`
@@ -19,6 +20,10 @@ type Submission struct {
 	Accepted                 bool
 
 	db.BaseObject
+}
+
+func (s Submission) NameWithId() string {
+	return fmt.Sprint(s.Assignment.Title, "-", s.ID)
 }
 
 //Submitter is the permission to upload to a submission

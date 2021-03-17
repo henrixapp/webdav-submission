@@ -27,9 +27,10 @@ type SharedWebDavFS struct {
 	mampfTermsClient          pb.MaMpfTermServiceClient
 	mampfLectureServiceClient pb.MaMpfLectureServiceClient
 	minioClient               *minio.Client
+	submissionRepository      admin.SubmissionRepository
 }
 
-func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, conn *grpc.ClientConn) SharedWebDavFS {
+func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, conn *grpc.ClientConn, submissionRepository admin.SubmissionRepository) SharedWebDavFS {
 	minioClient, err := minio.New(minioParams.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(minioParams.AccessKeyID, minioParams.SecretAccessKey, ""),
 		Secure: minioParams.UseSSL,
@@ -38,7 +39,8 @@ func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, co
 		log.Fatalln(err)
 	}
 	return SharedWebDavFS{minioClient: minioClient, mampfClient: auth.MaMpfClientImpl{}, mampfTermsClient: pb.NewMaMpfTermServiceClient(conn),
-		mampfLectureServiceClient: pb.NewMaMpfLectureServiceClient(conn)}
+		mampfLectureServiceClient: pb.NewMaMpfLectureServiceClient(conn),
+		submissionRepository:      submissionRepository}
 }
 
 func (SharedWebDavFS) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
@@ -61,6 +63,21 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			t, _ := strconv.ParseInt(termId, 10, 64)
 			lectures, _ := swdfs.mampfLectureServiceClient.GetLecturesForUser(ctx, &pb.LecturesByUserAndTermRequest{TermId: int32(t), UserId: ctx.Value("userID").(int32)})
 			return admin.LecturesOverview{Lectures: lectures.GetLectures()}, nil
+		}
+	}
+	//Find submissions for certain lecture
+	if len(path) == 4 && path[2] != "" && path[3] == "" {
+		if strings.LastIndex(path[2], "-") != -1 {
+			lectureId := strings.Split(path[2], "-")[len(strings.Split(path[2], "-"))-1]
+			l, _ := strconv.ParseInt(lectureId, 10, 64)
+			log.Println("L:", l, "U:", ctx.Value("userID").(int32))
+			submissions, _ := swdfs.submissionRepository.FindSubmissionsBySubmitterIDAndLectureID(int(ctx.Value("userID").(int32)), int(l))
+			log.Println(submissions)
+			entries := make([]admin.Entry, len(submissions))
+			for i, v := range submissions {
+				entries[i] = v
+			}
+			return admin.Overview{Entries: entries}, nil
 		}
 	}
 	log.Println(ctx.Value("userID"))

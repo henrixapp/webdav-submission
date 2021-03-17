@@ -7,10 +7,13 @@ import (
 	"time"
 
 	pb "github.com/henrixapp/mampf-rpc/grpc"
+	"github.com/henrixapp/webdav-submission/server/admin"
 	"github.com/henrixapp/webdav-submission/server/auth"
 	"github.com/henrixapp/webdav-submission/server/fs"
 	"golang.org/x/net/webdav"
 	"google.golang.org/grpc"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 var webd webdav.Handler
@@ -39,6 +42,13 @@ func BasicAuth(handler http.HandlerFunc, mampfAuthServiceClient pb.MaMpfAuthServ
 		handler(w, req)
 	}
 }
+func initializeDB() *gorm.DB {
+	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatalln("Fatal error while connecting to DB:", err)
+	}
+	return db
+}
 func main() {
 	conn, err := grpc.Dial("localhost:9001", grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
@@ -46,7 +56,8 @@ func main() {
 	}
 	defer conn.Close()
 	authService := pb.NewMaMpfAuthServiceClient(conn)
-	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(fs.MinioParams{Endpoint: "localhost", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"}, auth.MampfParams{}, conn), LockSystem: webdav.NewMemLS()}
+	db := initializeDB()
+	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(fs.MinioParams{Endpoint: "localhost", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"}, auth.MampfParams{}, conn, admin.NewSubmissionRepositoryGorm(db)), LockSystem: webdav.NewMemLS()}
 
 	log.Panicln(http.ListenAndServe(":3002", BasicAuth(webd.ServeHTTP, authService, "MaMpf")))
 }
