@@ -81,22 +81,32 @@ func (submissionsFile SubmissionsFile) Stat() (fs.FileInfo, error) {
 	return submissionsFile.SubmissionsFileInfo, nil
 }
 func (submissionsFile SubmissionsFile) Close() error {
-	submissionsFile.buffer.pos = 0
-	submissionsFile.minioClient.PutObject(context.Background(), bucketName, submissionsFile.ID.String(), submissionsFile.buffer, int64(len(submissionsFile.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	//TODO(henrik): Clean up?
 	return nil
 }
 
 //TODO(henrik): init filemust open file
 func (submissionsFile SubmissionsFile) Read(p []byte) (n int, err error) {
-	return submissionsFile.Read(p)
+	if submissionsFile.buffer != nil {
+		return submissionsFile.buffer.Read(p)
+	} else {
+		submissionsFile.get()
+	}
+
+	return 0, nil
 }
 
 func (submissionsFile SubmissionsFile) Seek(offset int64, whence int) (int64, error) {
 	return submissionsFile.buffer.Seek(offset, whence)
 }
-func (submissionsFile SubmissionsFile) Write(p []byte) (n int, err error) {
+func (submissionsFile SubmissionsFile) Write(p []byte) (int, error) {
 	//TODO(henrik): IF dir is supported later on... restrict it here
-	return submissionsFile.buffer.Write(p)
+	n, err := submissionsFile.buffer.Write(p)
+	if submissionsFile.buffer != nil {
+		submissionsFile.buffer.pos = 0
+		submissionsFile.minioClient.PutObject(context.Background(), bucketName, submissionsFile.ID.String(), submissionsFile.buffer, int64(len(submissionsFile.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	}
+	return n, err
 }
 
 func (t SubmissionsFileInfo) IsDir() bool {
@@ -113,7 +123,7 @@ func (t SubmissionsFileInfo) Name() string {
 
 func (t SubmissionsFileInfo) Mode() fs.FileMode {
 	//TODO(henrik): Implement write protection here
-	return 0644
+	return 777
 }
 func (t SubmissionsFileInfo) Size() int64 {
 	objInfo, err := t.minioClient.StatObject(context.Background(), bucketName, t.ID.String(), minio.StatObjectOptions{})
@@ -223,6 +233,7 @@ func (o Submission) Write(p []byte) (n int, err error) {
 }
 
 func (sf SubmissionsFile) get() {
+	sf.buffer = &fileBuffer{data: make([]byte, 0)}
 	object, err := sf.minioClient.GetObject(context.Background(), bucketName, sf.ID.String(), minio.GetObjectOptions{})
 	if err != nil {
 		log.Println(err)

@@ -40,7 +40,10 @@ func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, co
 		log.Fatalln(err)
 	}
 	bucketName := "mybucket"
-	err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
+	buckets, err := minioClient.ListBuckets(context.Background())
+	log.Println(buckets)
+	log.Println(err)
+	err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{Region: "default"})
 	if err != nil {
 		log.Println(err)
 		// Check to see if we already own this bucket (which happens if you run this twice)
@@ -122,6 +125,8 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 				}
 			}
 			//NOT FOUND --> Create file
+			log.Println("P:", perm)
+			log.Println("F:", flag)
 			return swdfs.submissionRepository.CreateSubmissionsFile(s, path[4], int(ctx.Value("userID").(int32)), swdfs.minioClient)
 		}
 	}

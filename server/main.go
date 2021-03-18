@@ -57,7 +57,7 @@ func main() {
 	defer conn.Close()
 	authService := pb.NewMaMpfAuthServiceClient(conn)
 	db := initializeDB()
-	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(fs.MinioParams{Endpoint: "localhost", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"}, auth.MampfParams{}, conn, admin.NewSubmissionRepositoryGorm(db)), LockSystem: webdav.NewMemLS()}
+	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(fs.MinioParams{Endpoint: "127.0.0.1:9000", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"}, auth.MampfParams{}, conn, admin.NewSubmissionRepositoryGorm(db)), LockSystem: webdav.NewMemLS()}
 
 	log.Panicln(http.ListenAndServe(":3002", BasicAuth(webd.ServeHTTP, authService, "MaMpf")))
 }

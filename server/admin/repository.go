@@ -1,7 +1,9 @@
 package admin
 
 import (
+	"context"
 	"errors"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -164,6 +166,7 @@ func (srg SubmissionRepositoryGorm) CreateTutor(tutor Tutor) error {
 func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissionID uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error) {
 	var submissionsFiles []SubmissionsFile
 	srg.db.Where("submission_id = ?", submissionID).Find(&submissionsFiles)
+	log.Println(submissionsFiles)
 	for s := range submissionsFiles {
 		submissionsFiles[s].minioClient = mC
 		submissionsFiles[s].get()
@@ -173,7 +176,7 @@ func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissio
 
 func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UUID, name string, user int, mC *minio.Client) (SubmissionsFile, error) {
 	subFI := SubmissionsFile{}
-	subFI.buffer = &fileBuffer{}
+	subFI.buffer = &fileBuffer{data: make([]byte, 0)}
 	subFI.minioClient = mC
 	subFI.SubmissionID = submissionUUID
 	subFI.LastEditedBy = user
@@ -181,5 +184,8 @@ func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UU
 	subFI.IsSolution = false
 	subFI.IsVisible = true //TODO(henrik): Fixme
 	srg.db.Create(&subFI)
+	log.Println(subFI)
+	subFI.buffer.pos = 0
+	subFI.minioClient.PutObject(context.Background(), bucketName, subFI.ID.String(), subFI.buffer, int64(len(subFI.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	return subFI, nil
 }
