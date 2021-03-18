@@ -2,6 +2,7 @@ package fs
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -16,6 +17,8 @@ import (
 	"golang.org/x/net/webdav"
 	"google.golang.org/grpc"
 )
+
+const bucketName = "mybucket"
 
 type MinioParams struct {
 	Endpoint        string
@@ -39,7 +42,7 @@ func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, co
 	if err != nil {
 		log.Fatalln(err)
 	}
-	bucketName := "mybucket"
+
 	buckets, err := minioClient.ListBuckets(context.Background())
 	log.Println(buckets)
 	log.Println(err)
@@ -98,7 +101,7 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			return admin.Overview{Entries: entries}, nil
 		}
 	}
-	if len(path) == 5 && path[3] != "" && path[4] == "" {
+	if (len(path) == 5 && path[3] != "" && path[4] == "") || (len(path) == 4 && path[3] != "") {
 		//overview over one submission
 		if strings.LastIndex(path[3], "$") != -1 {
 			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
@@ -106,7 +109,7 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
 			//FIXME(henrik): Permission check
 			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
-
+			log.Println("ssf", submissionsFiles)
 			return admin.Submission{SubmissionsFiles: submissionsFiles}, nil
 		}
 	}
@@ -133,8 +136,30 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 	log.Println(ctx.Value("userID"))
 	return File{}, nil
 }
-func (SharedWebDavFS) RemoveAll(ctx context.Context, name string) error {
-	log.Println(ctx, name)
+func (swdfs SharedWebDavFS) RemoveAll(ctx context.Context, name string) error {
+	log.Println("remove", ctx, name)
+	path := strings.Split(name, "/")
+	//Else return file
+	if len(path) == 5 && path[3] != "" && path[4] != "" {
+		//overview over one submission
+		if strings.LastIndex(path[3], "$") != -1 {
+			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
+			s, _ := uuid.Parse(submissionId)
+			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
+			//FIXME(henrik): Permission check
+			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
+			for _, v := range submissionsFiles {
+				if v.Name_ == path[4] {
+					//delete v
+					swdfs.minioClient.RemoveObject(ctx, bucketName, v.ID.String(), minio.RemoveObjectOptions{})
+					swdfs.submissionRepository.DeleteSubmissionsFile(v.ID)
+					return nil
+				}
+			}
+			//NOT FOUND --> Create file
+			return errors.New("file not found")
+		}
+	}
 	return nil
 }
 func (SharedWebDavFS) Rename(ctx context.Context, oldName, newName string) error {

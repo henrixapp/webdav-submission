@@ -131,6 +131,8 @@ func (t SubmissionsFileInfo) Size() int64 {
 		log.Println(err)
 		return 0
 	}
+
+	log.Println(objInfo)
 	return objInfo.Size
 }
 
@@ -212,10 +214,11 @@ func (o Submission) Readdir(count int) ([]fs.FileInfo, error) {
 	for i := range o.SubmissionsFiles {
 		res[i] = o.SubmissionsFiles[i]
 	}
+	log.Println("RES:", res)
 	return res, nil
 }
 func (o Submission) Stat() (fs.FileInfo, error) {
-	return DirInfo{}, nil
+	return DirInfo{Name_: o.NameWithId()}, nil
 }
 func (o Submission) Close() error {
 	return nil
@@ -232,7 +235,7 @@ func (o Submission) Write(p []byte) (n int, err error) {
 	return 0, nil
 }
 
-func (sf SubmissionsFile) get() {
+func (sf *SubmissionsFile) get() {
 	sf.buffer = &fileBuffer{data: make([]byte, 0)}
 	object, err := sf.minioClient.GetObject(context.Background(), bucketName, sf.ID.String(), minio.GetObjectOptions{})
 	if err != nil {

@@ -38,6 +38,8 @@ type SubmissionRepository interface {
 
 	FindSubmissionsFilesBySubmissionID(uuid uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error)
 	CreateSubmissionsFile(uuid uuid.UUID, name string, user int, mC *minio.Client) (SubmissionsFile, error)
+	//DeleteSubmissionsFile does not delete the bucket file
+	DeleteSubmissionsFile(id uuid.UUID) error
 }
 
 type SubmissionRepositoryGorm struct {
@@ -166,11 +168,14 @@ func (srg SubmissionRepositoryGorm) CreateTutor(tutor Tutor) error {
 func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissionID uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error) {
 	var submissionsFiles []SubmissionsFile
 	srg.db.Where("submission_id = ?", submissionID).Find(&submissionsFiles)
-	log.Println(submissionsFiles)
 	for s := range submissionsFiles {
 		submissionsFiles[s].minioClient = mC
 		submissionsFiles[s].get()
+
+		log.Println(":", submissionsFiles[s].Size())
+		log.Println("Bytes:", submissionsFiles[s].Size())
 	}
+	log.Println(submissionsFiles)
 	return submissionsFiles, nil
 }
 
@@ -188,4 +193,9 @@ func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UU
 	subFI.buffer.pos = 0
 	subFI.minioClient.PutObject(context.Background(), bucketName, subFI.ID.String(), subFI.buffer, int64(len(subFI.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
 	return subFI, nil
+}
+
+func (srg SubmissionRepositoryGorm) DeleteSubmissionsFile(subID uuid.UUID) error {
+	srg.db.Where("id = ?", subID).Delete(&SubmissionsFile{})
+	return nil
 }
