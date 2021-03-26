@@ -3,7 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
-	"log"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -36,10 +36,14 @@ type SubmissionRepository interface {
 	SaveInviteToSubmission(invite Invitation) error
 	AcceptInvitation(invite Invitation) error
 
-	FindSubmissionsFilesBySubmissionID(uuid uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error)
-	CreateSubmissionsFile(uuid uuid.UUID, name string, user int, mC *minio.Client) (SubmissionsFile, error)
+	//Returns DIR
+	FindSubmissionsFilesBySubmissionID(uuid uuid.UUID, mC *minio.Client) (map[string]SubmissionsFile, error)
+	FindSubmissionsSubFilesBySubmissionID(parent uuid.UUID, mC *minio.Client) (map[string]SubmissionsFile, error)
+	CreateSubmissionsFile(submissionUUID uuid.UUID, parent uuid.UUID, isDir bool, name string, user int, mC *minio.Client) (SubmissionsFile, error)
 	//DeleteSubmissionsFile does not delete the bucket file
 	DeleteSubmissionsFile(id uuid.UUID) error
+	//bool isParent
+	TraverseToFile(root SubmissionsFile, path []string, mC *minio.Client) (SubmissionsFile, bool, error)
 }
 
 type SubmissionRepositoryGorm struct {
@@ -165,21 +169,39 @@ func (srg SubmissionRepositoryGorm) CreateTutor(tutor Tutor) error {
 	return nil
 }
 
-func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissionID uuid.UUID, mC *minio.Client) ([]SubmissionsFile, error) {
+func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissionID uuid.UUID, mC *minio.Client) (map[string]SubmissionsFile, error) {
 	var submissionsFiles []SubmissionsFile
-	srg.db.Where("submission_id = ?", submissionID).Find(&submissionsFiles)
-	for s := range submissionsFiles {
+	res := make(map[string]SubmissionsFile)
+	srg.db.Where("submission_id = ? AND parent = ?", submissionID, uuid.Nil).Find(&submissionsFiles)
+	for s, sf := range submissionsFiles {
 		submissionsFiles[s].minioClient = mC
 		submissionsFiles[s].get()
-
-		log.Println(":", submissionsFiles[s].Size())
-		log.Println("Bytes:", submissionsFiles[s].Size())
+		res[sf.Name()] = submissionsFiles[s]
 	}
-	log.Println(submissionsFiles)
-	return submissionsFiles, nil
+	return res, nil
 }
 
-func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UUID, name string, user int, mC *minio.Client) (SubmissionsFile, error) {
+//TODO(henrik): enforce max recursion limit
+func (srg SubmissionRepositoryGorm) FindSubmissionsSubFilesBySubmissionID(parent uuid.UUID, mC *minio.Client) (map[string]SubmissionsFile, error) {
+	var submissionsFiles []SubmissionsFile
+	res := make(map[string]SubmissionsFile)
+	srg.db.Where("parent = ?", parent).Find(&submissionsFiles)
+	for _, sf := range submissionsFiles {
+		sf.minioClient = mC
+		if sf.IsDir() {
+			// var err error
+			// sf.Children, err = srg.FindSubmissionsSubFilesBySubmissionID(sf.ID, mC)
+			// if err != nil {
+			// 	return res, err
+			// }
+		} else {
+			sf.get()
+		}
+		res[sf.Name_] = sf
+	}
+	return res, nil
+}
+func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UUID, parent uuid.UUID, isDir bool, name string, user int, mC *minio.Client) (SubmissionsFile, error) {
 	subFI := SubmissionsFile{}
 	subFI.buffer = &fileBuffer{data: make([]byte, 0)}
 	subFI.minioClient = mC
@@ -188,14 +210,45 @@ func (srg SubmissionRepositoryGorm) CreateSubmissionsFile(submissionUUID uuid.UU
 	subFI.Name_ = name
 	subFI.IsSolution = false
 	subFI.IsVisible = true //TODO(henrik): Fixme
+	subFI.Parent = parent
+	subFI.Dir = isDir
 	srg.db.Create(&subFI)
-	log.Println(subFI)
-	subFI.buffer.pos = 0
-	subFI.minioClient.PutObject(context.Background(), bucketName, subFI.ID.String(), subFI.buffer, int64(len(subFI.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	if !subFI.IsDir() {
+		subFI.buffer.pos = 0
+		subFI.minioClient.PutObject(context.Background(), bucketName, subFI.ID.String(), subFI.buffer, int64(len(subFI.buffer.data)), minio.PutObjectOptions{ContentType: "application/octet-stream"})
+	}
 	return subFI, nil
 }
 
 func (srg SubmissionRepositoryGorm) DeleteSubmissionsFile(subID uuid.UUID) error {
 	srg.db.Where("id = ?", subID).Delete(&SubmissionsFile{})
 	return nil
+}
+
+//TraverseToFile Traverses To a specific File, does not open other files
+func (srg SubmissionRepositoryGorm) TraverseToFile(root SubmissionsFile, path []string, mC *minio.Client) (SubmissionsFile, bool, error) {
+	var sf SubmissionsFile = root
+	for _, p := range path {
+
+		if p != "" {
+			var submissionsFile SubmissionsFile
+			srg.db.Where("parent = ? AND name_ = ? ", sf.ID, p).Find(&submissionsFile)
+			if submissionsFile.ID == uuid.Nil {
+				return sf, true, os.ErrNotExist //return last folder existing
+			}
+			sf = submissionsFile
+			if !submissionsFile.IsDir() {
+				//reached the file
+				break
+			}
+		}
+	}
+	if !sf.IsDir() {
+		sf.minioClient = mC
+		sf.get()
+	} else {
+		//load subfiles
+		sf.Children, _ = srg.FindSubmissionsSubFilesBySubmissionID(sf.ID, mC)
+	}
+	return sf, false, nil
 }

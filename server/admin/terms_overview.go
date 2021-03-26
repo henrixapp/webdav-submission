@@ -3,7 +3,6 @@ package admin
 import (
 	"fmt"
 	"io/fs"
-	"log"
 	"time"
 
 	pb "github.com/henrixapp/mampf-rpc/grpc"
@@ -34,7 +33,6 @@ func (termsO TermsOverview) Readdir(count int) ([]fs.FileInfo, error) {
 	for i := range termsO.Terms {
 		res[i] = DirInfo{Name_: termsO.Terms[i].GetSeason() + fmt.Sprint(termsO.Terms[i].GetYear()) + "-" + fmt.Sprint(termsO.Terms[i].GetId())}
 	}
-	log.Println("FOlder returned")
 	return res, nil
 }
 func (termsO TermsOverview) Stat() (fs.FileInfo, error) {
@@ -83,7 +81,6 @@ func (lecturesO LecturesOverview) Readdir(count int) ([]fs.FileInfo, error) {
 	for i := range lecturesO.Lectures {
 		res[i] = DirInfo{Name_: lecturesO.Lectures[i].GetCourse().GetTitle() + "-" + fmt.Sprint(lecturesO.Lectures[i].GetId())}
 	}
-	log.Println("FOlder returned")
 	return res, nil
 }
 func (lecturesO LecturesOverview) Stat() (fs.FileInfo, error) {

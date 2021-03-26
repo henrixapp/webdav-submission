@@ -2,7 +2,6 @@ package fs
 
 import (
 	"io/fs"
-	"log"
 	"time"
 )
 
@@ -14,7 +13,6 @@ func (file File) Readdir(count int) ([]fs.FileInfo, error) {
 	res := make([]fs.FileInfo, 2)
 	res[0] = FileInfo{}
 	res[1] = FileInfo{}
-	log.Println("FOlder returned")
 	return res, nil
 }
 func (file File) Stat() (fs.FileInfo, error) {

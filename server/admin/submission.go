@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -32,7 +33,7 @@ type Submission struct {
 
 	db.BaseObject
 
-	SubmissionsFiles []SubmissionsFile
+	SubmissionsFiles map[string]SubmissionsFile `gorm:"-"`
 }
 
 func (s Submission) NameWithId() string {
@@ -59,7 +60,7 @@ type SubmissionsFileInfo struct {
 	db.BaseObject
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	Name_     string
+	Name_     string `gorm:"index:idx_file,unique"`
 	//IsSolution marks that an object is editable by tutor
 	IsSolution bool
 	//IsVisible determines whether file is readable
@@ -67,15 +68,28 @@ type SubmissionsFileInfo struct {
 	LastEditedBy int
 	minioClient  *minio.Client
 	buffer       *fileBuffer
+	//Bool if Dir
+	Dir      bool
+	Parent   uuid.UUID                  `gorm:"type:uuid;index:idx_file,unique"`
+	Children map[string]SubmissionsFile `gorm:"-"`
 }
 type SubmissionsFile struct {
-	SubmissionID uuid.UUID
+	SubmissionID uuid.UUID `gorm:"index:idx_file,unique"`
 	SubmissionsFileInfo
 }
 
 func (submissionsFile SubmissionsFile) Readdir(count int) ([]fs.FileInfo, error) {
+	if submissionsFile.Dir {
+		res := make([]fs.FileInfo, len(submissionsFile.Children))
+		j := 0
+		for _, sf := range submissionsFile.Children {
+			res[j] = sf
+			j += 1
+		}
+		return res, nil
+	}
 	res := make([]fs.FileInfo, 0)
-	return res, nil
+	return res, errors.New("Not a dir")
 }
 func (submissionsFile SubmissionsFile) Stat() (fs.FileInfo, error) {
 	return submissionsFile.SubmissionsFileInfo, nil
@@ -110,7 +124,7 @@ func (submissionsFile SubmissionsFile) Write(p []byte) (int, error) {
 }
 
 func (t SubmissionsFileInfo) IsDir() bool {
-	return false
+	return t.Dir
 }
 
 func (t SubmissionsFileInfo) ModTime() time.Time {
@@ -123,6 +137,9 @@ func (t SubmissionsFileInfo) Name() string {
 
 func (t SubmissionsFileInfo) Mode() fs.FileMode {
 	//TODO(henrik): Implement write protection here
+	if t.Dir {
+		return fs.ModeDir
+	}
 	return 777
 }
 func (t SubmissionsFileInfo) Size() int64 {
@@ -211,10 +228,11 @@ func (f *fileBuffer) Seek(offset int64, whence int) (int64, error) {
 
 func (o Submission) Readdir(count int) ([]fs.FileInfo, error) {
 	res := make([]fs.FileInfo, len(o.SubmissionsFiles))
-	for i := range o.SubmissionsFiles {
-		res[i] = o.SubmissionsFiles[i]
+	j := 0
+	for _, sf := range o.SubmissionsFiles {
+		res[j] = sf
+		j++
 	}
-	log.Println("RES:", res)
 	return res, nil
 }
 func (o Submission) Stat() (fs.FileInfo, error) {
@@ -243,7 +261,6 @@ func (sf *SubmissionsFile) get() {
 		return
 	}
 	if _, err = io.Copy(sf.buffer, object); err != nil {
-		fmt.Println(err)
 		return
 	}
 }

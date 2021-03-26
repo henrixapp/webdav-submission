@@ -2,7 +2,6 @@ package fs
 
 import (
 	"context"
-	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -43,9 +42,6 @@ func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, co
 		log.Fatalln(err)
 	}
 
-	buckets, err := minioClient.ListBuckets(context.Background())
-	log.Println(buckets)
-	log.Println(err)
 	err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{Region: "default"})
 	if err != nil {
 		log.Println(err)
@@ -64,16 +60,37 @@ func NewSharedWebDavFS(minioParams MinioParams, mampfParams auth.MampfParams, co
 		submissionRepository:      submissionRepository}
 }
 
-func (SharedWebDavFS) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
-	log.Println(ctx)
-	log.Println(name, perm)
+func (swdfs SharedWebDavFS) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
+
+	path := strings.Split(name, "/")
+	//Else return file
+	if len(path) >= 5 && path[3] != "" && path[4] != "" {
+		//overview over one submission
+		if strings.LastIndex(path[3], "$") != -1 {
+			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
+			s, _ := uuid.Parse(submissionId)
+			//FIXME(henrik): Permission check
+
+			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
+
+			sf, ok := submissionsFiles[path[4]]
+			if ok {
+				var err error
+				sf, _, err = swdfs.submissionRepository.TraverseToFile(sf, path[5:len(path)-1], swdfs.minioClient)
+				if err != nil {
+					return err
+				}
+			}
+			//implicitly ID is null, if root entry
+			parent := sf.ID
+			swdfs.submissionRepository.CreateSubmissionsFile(s, parent, true, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+
+		}
+	}
 	return nil
 }
 func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
-	log.Println(ctx, name, flag, perm)
-	log.Println(ctx, name)
 	path := strings.Split(name, "/")
-	log.Println(path, len(path))
 	if len(path) == 2 && path[1] == "" {
 		terms, _ := swdfs.mampfTermsClient.GetTerms(ctx, &pb.TermsRequest{UserId: ctx.Value("userID").(int32)})
 		return admin.TermsOverview{Terms: terms.GetTerms()}, nil
@@ -91,9 +108,7 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 		if strings.LastIndex(path[2], "-") != -1 {
 			lectureId := strings.Split(path[2], "-")[len(strings.Split(path[2], "-"))-1]
 			l, _ := strconv.ParseInt(lectureId, 10, 64)
-			log.Println("L:", l, "U:", ctx.Value("userID").(int32))
 			submissions, _ := swdfs.submissionRepository.FindSubmissionsBySubmitterIDAndLectureID(int(ctx.Value("userID").(int32)), int(l))
-			log.Println(submissions)
 			entries := make([]admin.Entry, len(submissions))
 			for i, v := range submissions {
 				entries[i] = v
@@ -106,80 +121,119 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 		if strings.LastIndex(path[3], "$") != -1 {
 			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
 			s, _ := uuid.Parse(submissionId)
-			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
 			//FIXME(henrik): Permission check
 			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
-			log.Println("ssf", submissionsFiles)
 			return admin.Submission{SubmissionsFiles: submissionsFiles}, nil
 		}
 	}
 	//Else return file
-	if len(path) == 5 && path[3] != "" && path[4] != "" {
+	if len(path) >= 5 && path[3] != "" && path[4] != "" {
 		//overview over one submission
 		if strings.LastIndex(path[3], "$") != -1 {
 			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
 			s, _ := uuid.Parse(submissionId)
-			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
 			//FIXME(henrik): Permission check
 			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
-			for _, v := range submissionsFiles {
-				if v.Name_ == path[4] {
-					return v, nil
+
+			sf, ok := submissionsFiles[path[4]]
+
+			var isParent bool
+			if ok {
+				sf, isParent, _ = swdfs.submissionRepository.TraverseToFile(sf, path[5:], swdfs.minioClient)
+				if isParent {
+					if flag&os.O_CREATE != 0 {
+						return swdfs.submissionRepository.CreateSubmissionsFile(s, sf.ID, false, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+					}
 				}
 			}
+			if sf.ID != uuid.Nil && !isParent {
+				return sf, nil
+			}
+			//implicitly ID is null, if root entry
+			parent := sf.ID
+			//TODO(henrik) what if not all exist?
 			//NOT FOUND --> Create file
-			log.Println("P:", perm)
-			log.Println("F:", flag)
-			return swdfs.submissionRepository.CreateSubmissionsFile(s, path[4], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+			if flag&os.O_CREATE != 0 {
+				if flag&os.O_EXCL != 0 && sf.ID != uuid.Nil {
+					return nil, os.ErrExist
+				}
+				if sf.ID == uuid.Nil {
+					return swdfs.submissionRepository.CreateSubmissionsFile(s, parent, false, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+				}
+			}
+
 		}
 	}
-	log.Println(ctx.Value("userID"))
-	return File{}, nil
+	return File{}, os.ErrNotExist
 }
 func (swdfs SharedWebDavFS) RemoveAll(ctx context.Context, name string) error {
-	log.Println("remove", ctx, name)
 	path := strings.Split(name, "/")
 	//Else return file
-	if len(path) == 5 && path[3] != "" && path[4] != "" {
+	if len(path) >= 5 && path[3] != "" && path[4] != "" {
 		//overview over one submission
 		if strings.LastIndex(path[3], "$") != -1 {
 			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
 			s, _ := uuid.Parse(submissionId)
-			log.Println("s:", s, "U:", ctx.Value("userID").(int32))
 			//FIXME(henrik): Permission check
 			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
-			for _, v := range submissionsFiles {
-				if v.Name_ == path[4] {
-					//delete v
-					swdfs.minioClient.RemoveObject(ctx, bucketName, v.ID.String(), minio.RemoveObjectOptions{})
-					swdfs.submissionRepository.DeleteSubmissionsFile(v.ID)
-					return nil
+
+			sf, ok := submissionsFiles[path[4]]
+			if ok {
+				var err error
+				sf, _, err = swdfs.submissionRepository.TraverseToFile(sf, path[5:], swdfs.minioClient)
+				if err != nil {
+					return err
 				}
+				if !sf.IsDir() {
+					swdfs.minioClient.RemoveObject(ctx, bucketName, sf.ID.String(), minio.RemoveObjectOptions{})
+				}
+				//FIXME(henrik): recursive
+				swdfs.submissionRepository.DeleteSubmissionsFile(sf.ID)
+				return nil
+
 			}
 			//NOT FOUND --> Create file
-			return errors.New("file not found")
+			return os.ErrNotExist
 		}
 	}
 	return nil
 }
 func (SharedWebDavFS) Rename(ctx context.Context, oldName, newName string) error {
-	log.Println(ctx, oldName, newName)
+	//TODO(henrik): Implement it
 	return nil
 }
 func (swdfs SharedWebDavFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
-	log.Println(ctx, name)
 	path := strings.Split(name, "/")
-	log.Println("Stat", path, len(path))
 	if len(path) == 2 && path[1] == "" {
 		return admin.DirInfo{}, nil
 	}
-	log.Println(ctx.Value("userID"))
 	if len(path) == 2 && path[1] != "" {
 		if strings.LastIndex(path[1], "-") != -1 {
 			termId := strings.Split(path[1], "-")[len(strings.Split(path[1], "-"))-1]
 			t, _ := strconv.ParseInt(termId, 10, 64)
 			lectures, _ := swdfs.mampfLectureServiceClient.GetLecturesForUser(ctx, &pb.LecturesByUserAndTermRequest{TermId: int32(t), UserId: ctx.Value("userID").(int32)})
 			return admin.LecturesOverview{Lectures: lectures.GetLectures()}.Stat()
+		}
+	}
+	//Else return file
+	if len(path) >= 5 && path[3] != "" && path[4] != "" {
+		//overview over one submission
+		if strings.LastIndex(path[3], "$") != -1 {
+			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
+			s, _ := uuid.Parse(submissionId)
+			//FIXME(henrik): Permission check
+			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
+
+			sf, ok := submissionsFiles[path[4]]
+			if ok {
+				sf, _, _ = swdfs.submissionRepository.TraverseToFile(sf, path[5:], swdfs.minioClient)
+			} else {
+				return FileInfo{}, os.ErrNotExist
+			}
+			if sf.ID != uuid.Nil {
+				return sf, nil
+			}
+			//implicitly ID is null, if root entry
 		}
 	}
 	return FileInfo{}, nil
