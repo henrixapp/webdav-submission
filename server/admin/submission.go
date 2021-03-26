@@ -19,6 +19,7 @@ import (
 //TODO(henrik): Size limits!
 //only one bucket for all TODO(henrik): Where to split?
 const bucketName = "mybucket"
+const MAXFILESIZE = 15000000
 
 //Submission is the handin of a group of Students, visible in the Filesystem
 type Submission struct {
@@ -115,6 +116,9 @@ func (submissionsFile SubmissionsFile) Seek(offset int64, whence int) (int64, er
 }
 func (submissionsFile SubmissionsFile) Write(p []byte) (int, error) {
 	//TODO(henrik): IF dir is supported later on... restrict it here
+	if submissionsFile.buffer.pos+len(p) > MAXFILESIZE {
+		return 0, fmt.Errorf("file to big")
+	}
 	n, err := submissionsFile.buffer.Write(p)
 	if submissionsFile.buffer != nil {
 		submissionsFile.buffer.pos = 0

@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 
 	"github.com/google/uuid"
@@ -38,6 +39,7 @@ type SubmissionRepository interface {
 
 	//Returns DIR
 	FindSubmissionsFilesBySubmissionID(uuid uuid.UUID, mC *minio.Client) (map[string]SubmissionsFile, error)
+	CountSubmissionsFilesBySubmissionID(uuid uuid.UUID) (int, error)
 	FindSubmissionsSubFilesBySubmissionID(parent uuid.UUID, mC *minio.Client) (map[string]SubmissionsFile, error)
 	CreateSubmissionsFile(submissionUUID uuid.UUID, parent uuid.UUID, isDir bool, name string, user int, mC *minio.Client) (SubmissionsFile, error)
 	//DeleteSubmissionsFile does not delete the bucket file
@@ -130,9 +132,12 @@ func (srg SubmissionRepositoryGorm) FindSubmissionByAssignmentIDAndTutorialID(as
 	return submission, nil
 }
 func (srg SubmissionRepositoryGorm) FindSubmissionByID(uuid uuid.UUID) (Submission, error) {
-	var sub Submission
-	srg.db.Where("id = ?", uuid).Find(&sub)
-	return sub, nil
+	var sub []Submission
+	srg.db.Preload("Assignment").Joins("JOIN assignments on submissions.assignment_id = assignments.id").Where("submissions.id = ?", uuid).Find(&sub)
+	if len(sub) == 0 {
+		return Submission{}, errors.New("not found")
+	}
+	return sub[0], nil
 }
 func (srg SubmissionRepositoryGorm) FindSubmissionBySubmitterIDAndAssignmentID(submitterID int, assignmentID uuid.UUID) (Submission, error) {
 	var submission Submission
@@ -179,6 +184,13 @@ func (srg SubmissionRepositoryGorm) FindSubmissionsFilesBySubmissionID(submissio
 		res[sf.Name()] = submissionsFiles[s]
 	}
 	return res, nil
+}
+
+func (srg SubmissionRepositoryGorm) CountSubmissionsFilesBySubmissionID(submissionID uuid.UUID) (int, error) {
+	var res int64
+	srg.db.Model(&SubmissionsFile{}).Where("submission_id = ?", submissionID).Count(&res)
+	log.Println("Res:", res)
+	return int(res), nil
 }
 
 //TODO(henrik): enforce max recursion limit

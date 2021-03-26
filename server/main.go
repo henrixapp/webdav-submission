@@ -47,7 +47,7 @@ func initializeDB() *gorm.DB {
 	if err != nil {
 		log.Fatalln("Fatal error while connecting to DB:", err)
 	}
-	return db
+	return db.Debug()
 }
 func main() {
 	conn, err := grpc.Dial("localhost:9001", grpc.WithInsecure(), grpc.WithBlock())

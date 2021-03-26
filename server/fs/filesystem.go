@@ -133,6 +133,11 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			submissionId := strings.Split(path[3], "$")[len(strings.Split(path[3], "$"))-1]
 			s, _ := uuid.Parse(submissionId)
 			//FIXME(henrik): Permission check
+			submission, err := swdfs.submissionRepository.FindSubmissionByID(s)
+			log.Println(submission.Assignment.MaxFileCount)
+			if err != nil {
+				return File{}, os.ErrNotExist
+			}
 			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
 
 			sf, ok := submissionsFiles[path[4]]
@@ -142,7 +147,11 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 				sf, isParent, _ = swdfs.submissionRepository.TraverseToFile(sf, path[5:], swdfs.minioClient)
 				if isParent {
 					if flag&os.O_CREATE != 0 {
-						return swdfs.submissionRepository.CreateSubmissionsFile(s, sf.ID, false, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+						if count, _ := swdfs.submissionRepository.CountSubmissionsFilesBySubmissionID(s); count < submission.Assignment.MaxFileCount || submission.Assignment.MaxFileCount == 0 {
+							return swdfs.submissionRepository.CreateSubmissionsFile(s, sf.ID, false, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+						} else {
+							return nil, os.ErrInvalid
+						}
 					}
 				}
 			}
@@ -155,10 +164,14 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			//NOT FOUND --> Create file
 			if flag&os.O_CREATE != 0 {
 				if flag&os.O_EXCL != 0 && sf.ID != uuid.Nil {
-					return nil, os.ErrExist
+					return nil, os.ErrDeadlineExceeded
 				}
 				if sf.ID == uuid.Nil {
-					return swdfs.submissionRepository.CreateSubmissionsFile(s, parent, false, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+					if count, _ := swdfs.submissionRepository.CountSubmissionsFilesBySubmissionID(s); count < submission.Assignment.MaxFileCount || 0 == submission.Assignment.MaxFileCount {
+						return swdfs.submissionRepository.CreateSubmissionsFile(s, parent, false, path[len(path)-1], int(ctx.Value("userID").(int32)), swdfs.minioClient)
+					} else {
+						return nil, os.ErrInvalid
+					}
 				}
 			}
 
