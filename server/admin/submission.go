@@ -59,9 +59,7 @@ type Invitation struct {
 //Implements a FileInfo
 type SubmissionsFileInfo struct {
 	db.BaseObject
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Name_     string `gorm:"index:idx_file,unique"`
+	Name_ string `gorm:"index:idx_file,unique"`
 	//IsSolution marks that an object is editable by tutor
 	IsSolution bool
 	//IsVisible determines whether file is readable

@@ -1,0 +1,421 @@
+openapi: "3.0.3"
+info:
+  title: Submissions
+  description: >
+    This API specifies the submissions service, as accessed by the web admin UI used by students, lecturers and tutors.
+  version: "1.0"
+servers:
+  - url: https://mampf.mathi.uni-heidelberg.de/v1/submissions
+paths:
+  /lecture/{lectureID}/assignments:
+    parameters:
+      - in: path
+        name: lectureID
+        schema:
+          type: integer
+        required: true
+        description: ID of the lecture in question
+    get:
+      responses:
+        "200":
+          description: Returns the assignments of an lecture.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assignment"
+    post:
+      description: Add an new Assignment to a lecture.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Assignment"
+      responses:
+        "201":
+          description: Created. The assignment was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+  /assignments/{assignmentID}:
+    parameters:
+      - in: path
+        name: assignmentID
+        schema:
+          type: integer
+        required: true
+        description: ID of the assignment in question
+    get:
+      responses:
+        "200":
+          description: Returns the assignment in question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Assignment"
+      responses:
+        "200":
+          description: Returns the updated assignment provided in the request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assignment"
+    delete:
+      responses:
+        "204":
+          description: affirms that the requested homework was deleted (if possible). Should check if data is still present.
+  /lecture/{lectureID}/tutorials:
+    parameters:
+      - in: path
+        name: lectureID
+        schema:
+          type: integer
+        required: true
+        description: ID of the lecture in question
+    get:
+      responses:
+        "200":
+          description: Returns the tutorials of an lecture.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tutorial"
+    post:
+      description: Add an new Tutorial to a lecture.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Tutorial"
+      responses:
+        "201":
+          description: Created. The tutorial was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tutorial"
+  /tutorials/{tutorialID}/tutors:
+    parameters:
+      - in: path
+        name: tutorialID
+        schema:
+          type: integer
+        required: true
+        description: ID of the tutorial in question
+    get:
+      responses:
+        "200":
+          description: Returns the list of Tutors that are tutor.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tutor"
+  /tutorials/{tutorialID}/tutors/{userID}:
+    parameters:
+      - in: path
+        name: tutorialID
+        schema:
+          type: integer
+        required: true
+        description: ID of the tutorial in question
+      - in: path
+        name: userID
+        schema:
+          type: integer
+        required: true
+        description: ID of the user (foreign)
+    get:
+      responses:
+        "200":
+          description: Returns the tutor Object for an user. Does not create it.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tutor"
+    post:
+      responses:
+        "200":
+          description: Adds an tutor for userID to tutorialID
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tutor"
+    delete:
+      responses:
+        "204":
+          description: Deletes the tutor permission for this user and tutorial
+  /lecture/{lectureID}/submissions:
+    parameters:
+      - in: path
+        name: lectureID
+        schema:
+          type: integer
+        required: true
+        description: ID of the lecture in question
+    get:
+      responses:
+        "200":
+          description: Returns the submissions of an lecture.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+    post:
+      description: Add an new Assignment to a lecture.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Submission"
+      responses:
+        "201":
+          description: Created. The submission was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+  /submissions/{token}/join:
+    parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+        description: token of the submission to join
+    post:
+      description: Join by code
+      responses:
+        "201":
+          description: Returns the submission just joined!
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+  /submissions/{submissionID}/invitations:
+    parameters:
+      - in: path
+        name: submissionID
+        schema:
+          type: string
+        required: true
+        description: ID of the submission in question
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Invitation"
+      responses:
+        "201":
+          description: Returns the invitation just created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invitation"
+    get:
+      responses:
+        "200":
+          description: Returns all Invitations for a submission.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invitation"
+  /submissions/{submissionID}:
+    parameters:
+      - in: path
+        name: submissionID
+        schema:
+          type: string
+        required: true
+        description: ID of the submission in question
+    get:
+      responses:
+        "200":
+          description: Returns the submission in question
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Submission"
+      responses:
+        "200":
+          description: Returns the updated submission provided in the request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+    delete:
+      responses:
+        "204":
+          description: affirms that the requested submission was deleted (if possible). Should check if data is still present.
+  /lectures/{lectureID}/invitations:
+    parameters:
+      - in: path
+        name: lectureID
+        schema:
+          type: integer
+        required: true
+        description: ID of the lecture in question
+    get:
+      responses:
+        "200":
+          description: Returns all Invitations for the current user in this lecture
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invitation"
+  /invitations:
+    get:
+      responses:
+        "200":
+          description: Returns all Invitations for the current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Invitation"
+components:
+  schemas:
+    Assignment:
+      type: object
+      description: The assignment is part of an lecture and can be linked to a media
+      properties:
+        id:
+          type: string
+          description: The globally recognized ID of an Assignment.
+        lectureID:
+          type: integer
+          description: The ID of the lecture the assignment is part of. (foreign)
+        mediumID:
+          type: integer
+          description: The ID of the medium the submission is linked to (foreign)
+        deadline:
+          type: string
+          format: date-time
+          description: Due date of an submission. Submissions afterwards will be rejected. Currently there is no support for a grace period.
+        title:
+          type: string
+          description: A descriptive title for the assignment
+        acceptedFileType:
+          type: string
+          description: Predefine filetype for upload in webUI, currently not enforced by backend.
+        maxFileCount:
+          type: number
+          description: Maximum of files to be submitted. 0 for infinity
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Tutorial:
+      type: object
+      description: The tutorial is part of an lecture and can have multiple tutors
+      properties:
+        id:
+          type: string
+          description: The globally recognized ID of an Tutorial.
+        lectureID:
+          type: integer
+          description: The ID of the lecture this tutorial is located in. (foreign)
+        title:
+          type: string
+          description: A short descriptive title of the tutorial
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Tutor:
+      type: object
+      description: The ability to read all submissions of a certain tutorial.
+      properties:
+        userID:
+          type: integer
+          description: The user ID of the tutor. (foreign)
+        tutorialID:
+          type: string
+          description: The ID of the tutor
+    Submission:
+      type: object
+      description: a bundle of files to be submission
+      properties:
+        id:
+          type: string
+          description: The globally recognized ID of an submission
+        assignmentID:
+          type: string
+          description: The globally recognized ID of the assignment
+        tutorialID:
+          type: string
+          description: The tutorial the submission is part of
+        token:
+          type: string
+          description: The base56 code to sign
+        lastModificationByUserAt:
+          type: string
+          format: date-time
+          description: The timestamp of the last modification by user.
+        accepted:
+          type: boolean
+          description: bool to determine if submission was on time or accepted.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Invitation:
+      type: object
+      description: a invitation to a submission
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        invitedUserID:
+          type: integer
+          description: the invitedUserID is invited by invitingUserID
+        invitingUserID:
+          type: integer
+          description: the invitingUserID invites an invitedUserID
+        submissionID:
+          type: string
+          description: the submission that is subject of the invitation
