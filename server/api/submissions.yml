@@ -194,7 +194,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Submission"
-  /submissions/{token}/join:
+  /token/{token}/join:
     parameters:
       - in: path
         name: token
@@ -306,6 +306,28 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Invitation"
+  /invitations/{invitationID}/{mode}:
+    parameters:
+      - in: path
+        name: invitationID
+        required: true
+        schema:
+          type: string
+        description: The ID of the invitation to accept/withdraw/decline
+      - in: path
+        name: mode
+        required: true
+        schema:
+          type: string
+          enum:
+            - accept
+            - decline
+            - withdraw
+        description: The change to the invitation
+    post:
+      responses:
+        "204":
+          description: Affirms that the given action was completed.
 components:
   schemas:
     Assignment:
@@ -332,7 +354,7 @@ components:
           type: string
           description: Predefine filetype for upload in webUI, currently not enforced by backend.
         maxFileCount:
-          type: number
+          type: integer
           description: Maximum of files to be submitted. 0 for infinity
         createdAt:
           type: string

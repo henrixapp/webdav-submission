@@ -23,18 +23,18 @@ const MAXFILESIZE = 15000000
 
 //Submission is the handin of a group of Students, visible in the Filesystem
 type Submission struct {
-	AssignmentID             uuid.UUID
-	Assignment               Assignment `gorm:"foreignKey:AssignmentID"`
-	TutorialID               uuid.UUID
-	Tutorial                 Tutorial `gorm:"foreignKey:TutorialID"`
-	Token                    string
-	ManuscriptData           string
-	LastModificationByUserAt time.Time
-	Accepted                 bool
+	AssignmentID             uuid.UUID  `json:"assignmentID,omitempty"`
+	Assignment               Assignment `gorm:"foreignKey:AssignmentID" json:"-"`
+	TutorialID               uuid.UUID  `json:"tutorialID,omitempty"`
+	Tutorial                 Tutorial   `gorm:"foreignKey:TutorialID" json:"-"`
+	Token                    string     `json:"token,omitempty"`
+	ManuscriptData           string     `json:"-"`
+	LastModificationByUserAt time.Time  `json:"lastModificatonByUserAt,omitempty"`
+	Accepted                 bool       `json:"accepted,omitempty"`
 
 	db.BaseObject
 
-	SubmissionsFiles map[string]SubmissionsFile `gorm:"-"`
+	SubmissionsFiles map[string]SubmissionsFile `gorm:"-", json:"-"`
 }
 
 func (s Submission) NameWithId() string {
@@ -50,9 +50,9 @@ type Submitter struct {
 //Invitation is the permission to become a submitter.
 type Invitation struct {
 	db.BaseObject
-	InvitedUserID  int
-	InvitingUserID int
-	SubmissionID   uuid.UUID
+	InvitedUserID  int       `json:"invitedUserID,omitempty"`
+	InvitingUserID int       `json:"invitingUserID,omitempty"`
+	SubmissionID   uuid.UUID `json:"submissionID,omitempty"`
 }
 
 //SubmissionsFileInfo mimics a solution/submission part

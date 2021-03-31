@@ -8,12 +8,12 @@ import (
 //Tutorial is the group in which submissions are corrected --> User
 type Tutorial struct {
 	db.BaseObject
-	Title     string
-	LectureID int
+	Title     string `json:"title,omitempty"`
+	LectureID int    `json:"lectureID,omitempty"`
 }
 
 //Tutor is the permission to access certain submissions
 type Tutor struct {
-	UserID     int
-	TutorialID uuid.UUID
+	UserID     int       `json:"userID,omitempty"`
+	TutorialID uuid.UUID `json:"tutorialID,omitempty"`
 }

@@ -217,8 +217,11 @@ func (SharedWebDavFS) Rename(ctx context.Context, oldName, newName string) error
 }
 func (swdfs SharedWebDavFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 	path := strings.Split(name, "/")
+
+	log.Println(path)
 	if len(path) == 2 && path[1] == "" {
-		return admin.DirInfo{}, nil
+		terms, _ := swdfs.mampfTermsClient.GetTerms(ctx, &pb.TermsRequest{UserId: ctx.Value("userID").(int32)})
+		return admin.TermsOverview{Terms: terms.GetTerms()}, nil
 	}
 	if len(path) == 2 && path[1] != "" {
 		if strings.LastIndex(path[1], "-") != -1 {

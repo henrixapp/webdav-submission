@@ -27,6 +27,26 @@ type Entry interface {
 type Overview struct {
 	Entries []Entry
 }
+func (termsO TermsOverview) IsDir() bool {
+	return true
+}
+func (termsO TermsOverview) ModTime() time.Time {
+	return time.Now()
+}
+func (t TermsOverview) Mode() fs.FileMode {
+	return fs.ModeDir
+}
+func (t TermsOverview) Size() int64 {
+	return 4096
+}
+func (t TermsOverview) Name() string {
+	return "/"
+}
+
+func (t TermsOverview) Sys() interface{} {
+	return nil
+}
+
 
 func (termsO TermsOverview) Readdir(count int) ([]fs.FileInfo, error) {
 	res := make([]fs.FileInfo, len(termsO.Terms))
