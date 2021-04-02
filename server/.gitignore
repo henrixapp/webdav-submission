@@ -67,3 +67,6 @@ Temporary Items
 
 data/
 minio
+test.db
+main
+server

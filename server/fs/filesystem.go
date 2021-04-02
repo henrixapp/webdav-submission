@@ -95,7 +95,7 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 		terms, _ := swdfs.mampfTermsClient.GetTerms(ctx, &pb.TermsRequest{UserId: ctx.Value("userID").(int32)})
 		return admin.TermsOverview{Terms: terms.GetTerms()}, nil
 	}
-	if len(path) == 3 && path[1] != "" {
+	if (len(path) == 2 || len(path) == 3) && path[1] != "" {
 		if strings.LastIndex(path[1], "-") != -1 {
 			termId := strings.Split(path[1], "-")[len(strings.Split(path[1], "-"))-1]
 			t, _ := strconv.ParseInt(termId, 10, 64)
@@ -136,6 +136,7 @@ func (swdfs SharedWebDavFS) OpenFile(ctx context.Context, name string, flag int,
 			submission, err := swdfs.submissionRepository.FindSubmissionByID(s)
 			log.Println(submission.Assignment.MaxFileCount)
 			if err != nil {
+				log.Println("FEHLER1,", err)
 				return File{}, os.ErrNotExist
 			}
 			submissionsFiles, _ := swdfs.submissionRepository.FindSubmissionsFilesBySubmissionID(s, swdfs.minioClient)
