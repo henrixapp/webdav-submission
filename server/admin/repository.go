@@ -9,6 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 	"gorm.io/gorm"
+
+	"github.com/casbin/casbin/v2"
+	gormadapter "github.com/casbin/gorm-adapter/v3"
 )
 
 type SubmissionRepository interface {
@@ -49,7 +52,8 @@ type SubmissionRepository interface {
 }
 
 type SubmissionRepositoryGorm struct {
-	db *gorm.DB
+	db       *gorm.DB
+	enforcer *casbin.Enforcer
 }
 
 func NewSubmissionRepositoryGorm(db *gorm.DB) SubmissionRepository {
@@ -60,7 +64,9 @@ func NewSubmissionRepositoryGorm(db *gorm.DB) SubmissionRepository {
 	db.AutoMigrate(&Submitter{})
 	db.AutoMigrate(&Invitation{})
 	db.AutoMigrate(&SubmissionsFile{})
-	return SubmissionRepositoryGorm{db: db}
+	a, _ := gormadapter.NewAdapterByDB(db)
+	e, _ := casbin.NewEnforcer("rbac.conf", a)
+	return SubmissionRepositoryGorm{db: db, enforcer: e}
 }
 
 func (srg SubmissionRepositoryGorm) CreateTutorial(tutorial Tutorial) (uuid.UUID, error) {

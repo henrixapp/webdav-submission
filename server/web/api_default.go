@@ -10,9 +10,11 @@
 package web
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/henrixapp/webdav-submission/server/admin"
 )
 
@@ -20,23 +22,66 @@ type SubmissionsWebAPIProvider struct {
 	submissionRepository admin.SubmissionRepository
 }
 
+const USER_HEADER = "X-Forwarded-User"
+
 // AssignmentsAssignmentIDDelete -
 func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDDelete(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+
+	id, err := uuid.Parse(c.Param("assignmentID"))
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	err = api.submissionRepository.DeleteAssignment(id)
+	//FIXME(henrik): permissions check
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 // AssignmentsAssignmentIDGet -
 func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	id, err := uuid.Parse(c.Param("assignmentID"))
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	r, err := api.submissionRepository.FindAssignmentByID(id)
+	c.JSON(http.StatusOK, r)
 }
 
 // AssignmentsAssignmentIDPut -
 func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDPut(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+
+	id, err := uuid.Parse(c.Param("assignmentID"))
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	var assignment admin.Assignment
+	err = c.Bind(&assignment)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	//FIXME(henrik): permissions check
+	assignment.ID = id
+	err = api.submissionRepository.UpdateAssignment(assignment)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, assignment)
 }
 
 // InvitationsGet -
 func (api *SubmissionsWebAPIProvider) InvitationsGet(c *gin.Context) {
+	c.Request.Header.Get(USER_HEADER)
 	c.JSON(http.StatusOK, gin.H{})
 }
 

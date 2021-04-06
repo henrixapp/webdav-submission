@@ -3,6 +3,8 @@ module github.com/henrixapp/webdav-submission/server
 go 1.16
 
 require (
+	github.com/casbin/casbin/v2 v2.25.6
+	github.com/casbin/gorm-adapter/v3 v3.2.5
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
