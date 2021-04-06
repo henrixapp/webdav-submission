@@ -11,13 +11,18 @@ import (
 	"github.com/henrixapp/webdav-submission/server/auth"
 	"github.com/henrixapp/webdav-submission/server/fs"
 	"github.com/henrixapp/webdav-submission/server/web"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/net/webdav"
 	"google.golang.org/grpc"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 var webd webdav.Handler
+
+const bucketName = "mybucket"
 
 func Log(r *http.Request, err error) {
 	log.Println(err)
@@ -53,6 +58,38 @@ func initializeDB() *gorm.DB {
 	}
 	return db.Debug()
 }
+
+type MinioParams struct {
+	Endpoint        string
+	AccessKeyID     string
+	SecretAccessKey string
+	UseSSL          bool
+}
+
+func initializeMinioClient(minioParams MinioParams) *minio.Client {
+	minioClient, err := minio.New(minioParams.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(minioParams.AccessKeyID, minioParams.SecretAccessKey, ""),
+		Secure: minioParams.UseSSL,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{Region: "default"})
+	if err != nil {
+		log.Println(err)
+		// Check to see if we already own this bucket (which happens if you run this twice)
+		exists, errBucketExists := minioClient.BucketExists(context.Background(), bucketName)
+		if errBucketExists == nil && exists {
+			log.Printf("We already own %s\n", bucketName)
+		} else {
+			log.Fatalln("NOPE", err)
+		}
+	} else {
+		log.Printf("Successfully created %s\n", bucketName)
+	}
+	return minioClient
+}
 func main() {
 	conn, err := grpc.Dial("localhost:9001", grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
@@ -61,8 +98,9 @@ func main() {
 	defer conn.Close()
 	authService := pb.NewMaMpfAuthServiceClient(conn)
 	db := initializeDB()
-	rep := admin.NewSubmissionRepositoryGorm(db)
-	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(fs.MinioParams{Endpoint: "127.0.0.1:9000", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"}, auth.MampfParams{}, conn, rep), LockSystem: webdav.NewMemLS()}
+	minioClient := initializeMinioClient(MinioParams{Endpoint: "127.0.0.1:9000", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"})
+	rep := admin.NewSubmissionRepositoryGorm(db, minioClient)
+	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(auth.MampfParams{}, conn, rep), LockSystem: webdav.NewMemLS()}
 	go func(submissionsRep admin.SubmissionRepository) {
 		log.Printf("Server started")
 

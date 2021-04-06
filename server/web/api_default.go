@@ -12,6 +12,7 @@ package web
 import (
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -32,7 +33,13 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDDelete(c *gin.Conte
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	err = api.submissionRepository.DeleteAssignment(id)
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	err = api.submissionRepository.DeleteAssignment(id, userID)
 	//FIXME(henrik): permissions check
 	if err != nil {
 		log.Println(err)
@@ -50,7 +57,13 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDGet(c *gin.Context)
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	r, err := api.submissionRepository.FindAssignmentByID(id)
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	r, err := api.submissionRepository.FindAssignmentByID(id, userID)
 	c.JSON(http.StatusOK, r)
 }
 
@@ -69,8 +82,14 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDPut(c *gin.Context)
 		return
 	}
 	//FIXME(henrik): permissions check
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
 	assignment.ID = id
-	err = api.submissionRepository.UpdateAssignment(assignment)
+	err = api.submissionRepository.UpdateAssignment(assignment, userID)
 	if err != nil {
 		log.Println(err)
 		c.Status(http.StatusInternalServerError)
