@@ -39,7 +39,7 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDDelete(c *gin.Conte
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	err = api.submissionRepository.DeleteAssignment(id, userID)
+	err = api.submissionRepository.DeleteAssignment(id, int32(userID))
 	//FIXME(henrik): permissions check
 	if err != nil {
 		log.Println(err)
@@ -63,7 +63,7 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDGet(c *gin.Context)
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	r, err := api.submissionRepository.FindAssignmentByID(id, userID)
+	r, err := api.submissionRepository.FindAssignmentByID(id, int32(userID))
 	c.JSON(http.StatusOK, r)
 }
 
@@ -89,7 +89,7 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDPut(c *gin.Context)
 		return
 	}
 	assignment.ID = id
-	err = api.submissionRepository.UpdateAssignment(assignment, userID)
+	err = api.submissionRepository.UpdateAssignment(assignment, int32(userID))
 	if err != nil {
 		log.Println(err)
 		c.Status(http.StatusInternalServerError)
@@ -100,96 +100,413 @@ func (api *SubmissionsWebAPIProvider) AssignmentsAssignmentIDPut(c *gin.Context)
 
 // InvitationsGet -
 func (api *SubmissionsWebAPIProvider) InvitationsGet(c *gin.Context) {
-	c.Request.Header.Get(USER_HEADER)
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	invitations, err := api.submissionRepository.FindInvitationByUserID(int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, invitations)
 }
 
 // InvitationsInvitationIDModePost -
 func (api *SubmissionsWebAPIProvider) InvitationsInvitationIDModePost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	invitationID, err := uuid.Parse(c.Param("invitationID"))
+	invitation, err := api.submissionRepository.FindInvitation(invitationID)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	mode := c.Param("mode")
+	if mode == "accept" {
+		err := api.submissionRepository.AcceptInvitation(invitation, int32(userID))
+		if err != nil {
+			log.Println(err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+	}
+	if mode == "withdraw" || mode == "decline" {
+		err := api.submissionRepository.DeleteInvitation(invitation, int32(userID))
+		if err != nil {
+			log.Println(err)
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+	}
+	c.Status(http.StatusNoContent)
 }
 
 // LectureLectureIDAssignmentsGet -
 func (api *SubmissionsWebAPIProvider) LectureLectureIDAssignmentsGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	lectureID, err := strconv.Atoi(c.Param("lectureID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	assignments, err := api.submissionRepository.FindAssignmentByLectureID(lectureID, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, assignments)
 }
 
 // LectureLectureIDAssignmentsPost -
 func (api *SubmissionsWebAPIProvider) LectureLectureIDAssignmentsPost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	var assign admin.Assignment
+	err = c.Bind(&assign)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	assignment, err := api.submissionRepository.CreateAssignment(assign, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, assignment)
 }
 
 // LectureLectureIDSubmissionsGet -
 func (api *SubmissionsWebAPIProvider) LectureLectureIDSubmissionsGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	lectureID, err := strconv.Atoi(c.Param("lectureID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	submissions, err := api.submissionRepository.FindSubmissionsBySubmitterIDAndLectureID(userID, lectureID, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, submissions)
 }
 
 // LectureLectureIDSubmissionsPost -
 func (api *SubmissionsWebAPIProvider) LectureLectureIDSubmissionsPost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	//TODO(henrik): obvisously this route could be just /submissions
+	var submission admin.Submission
+	c.Bind(&submission)
+	submission.ID, err = api.submissionRepository.CreateSubmission(submission, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusCreated, submission)
 }
 
 // LectureLectureIDTutorialsGet -
 func (api *SubmissionsWebAPIProvider) LectureLectureIDTutorialsGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	lectureID, err := strconv.Atoi(c.Param("lectureID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	tutorials, err := api.submissionRepository.FindTutorialByLectureID(lectureID, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, tutorials)
 }
 
 // LectureLectureIDTutorialsPost -
 func (api *SubmissionsWebAPIProvider) LectureLectureIDTutorialsPost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	lectureID, err := strconv.Atoi(c.Param("lectureID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	var tutorial admin.Tutorial
+	c.Bind(&tutorial)
+	tutorial.LectureID = lectureID
+	tutorial.ID, err = api.submissionRepository.CreateTutorial(tutorial, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusCreated, tutorial)
 }
 
 // LecturesLectureIDInvitationsGet -
 func (api *SubmissionsWebAPIProvider) LecturesLectureIDInvitationsGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	c.Status(http.StatusNotImplemented)
 }
 
 // SubmissionsSubmissionIDDelete -
 func (api *SubmissionsWebAPIProvider) SubmissionsSubmissionIDDelete(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	submissionID, err := uuid.Parse(c.Param("submissionID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	err = api.submissionRepository.DeleteSubmission(submissionID, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 // SubmissionsSubmissionIDGet -
 func (api *SubmissionsWebAPIProvider) SubmissionsSubmissionIDGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	submissionID, err := uuid.Parse(c.Param("submissionID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	submission, err := api.submissionRepository.FindSubmissionByID(submissionID, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, submission)
 }
 
 // SubmissionsSubmissionIDInvitationsGet -
 func (api *SubmissionsWebAPIProvider) SubmissionsSubmissionIDInvitationsGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	submissionID, err := uuid.Parse(c.Param("submissionID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	invites, err := api.submissionRepository.FindInvitationBySubmissionsID(submissionID, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, invites)
 }
 
 // SubmissionsSubmissionIDInvitationsPost -
 func (api *SubmissionsWebAPIProvider) SubmissionsSubmissionIDInvitationsPost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	submissionID, err := uuid.Parse(c.Param("submissionID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	var invitation admin.Invitation
+	c.Bind(&invitation)
+	invitation.SubmissionID = submissionID
+	err = api.submissionRepository.SaveInviteToSubmission(invitation, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, invitation)
 }
 
 // SubmissionsSubmissionIDPut -
 func (api *SubmissionsWebAPIProvider) SubmissionsSubmissionIDPut(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	//TODO(henrik): obvisously this route could be just /submissions
+	var submission admin.Submission
+	c.Bind(&submission)
+	submissionID, err := uuid.Parse(c.Param("submissionID"))
+	submission.ID = submissionID
+	err = api.submissionRepository.UpdateSubmission(submission, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, submission)
 }
 
 // SubmissionsTokenJoinPost -
 func (api *SubmissionsWebAPIProvider) SubmissionsTokenJoinPost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	if c.Param("token") == "" {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	submission, err := api.submissionRepository.SubmissionJoinByToken(c.Param("token"), int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, submission)
 }
 
 // TutorialsTutorialIDTutorsGet -
 func (api *SubmissionsWebAPIProvider) TutorialsTutorialIDTutorsGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	tutorialID, err := uuid.Parse(c.Param("tutorialID"))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	tutors, err := api.submissionRepository.FindTutorsByTutorialID(tutorialID)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, tutors)
 }
 
 // TutorialsTutorialIDTutorsUserIDDelete -
 func (api *SubmissionsWebAPIProvider) TutorialsTutorialIDTutorsUserIDDelete(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	tutorID, err := strconv.Atoi(c.Param("userID"))
+	tutorialID, err := uuid.Parse(c.Param("tutorialID"))
+	tutor := admin.Tutor{UserID: tutorID, TutorialID: tutorialID}
+	err = api.submissionRepository.DeleteTutor(tutor, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, tutor)
 }
 
 // TutorialsTutorialIDTutorsUserIDGet -
 func (api *SubmissionsWebAPIProvider) TutorialsTutorialIDTutorsUserIDGet(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	log.Println("TutorialsTutorialIDTutorsUserIDGet not implemented, but calleed")
+	c.Status(http.StatusNotImplemented)
 }
 
 // TutorialsTutorialIDTutorsUserIDPost -
 func (api *SubmissionsWebAPIProvider) TutorialsTutorialIDTutorsUserIDPost(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{})
+	u := c.Request.Header.Get(USER_HEADER)
+	userID, err := strconv.Atoi(u)
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	tutorID, err := strconv.Atoi(c.Param("userID"))
+	tutorialID, err := uuid.Parse(c.Param("tutorialID"))
+	tutor := admin.Tutor{UserID: tutorID, TutorialID: tutorialID}
+	err = api.submissionRepository.CreateTutor(tutor, int32(userID))
+	if err != nil {
+		log.Println(err)
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+	c.JSON(http.StatusOK, tutor)
 }

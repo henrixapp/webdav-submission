@@ -180,7 +180,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/Submission"
     post:
-      description: Add an new Assignment to a lecture.
+      description: Add an new submission to a lecture.
       requestBody:
         required: true
         content:

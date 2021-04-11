@@ -97,9 +97,10 @@ func main() {
 	}
 	defer conn.Close()
 	authService := pb.NewMaMpfAuthServiceClient(conn)
+	lectureService := pb.NewMaMpfLectureServiceClient(conn)
 	db := initializeDB()
 	minioClient := initializeMinioClient(MinioParams{Endpoint: "127.0.0.1:9000", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"})
-	rep := admin.NewSubmissionRepositoryGorm(db, minioClient)
+	rep := admin.NewSubmissionRepositoryGorm(db, minioClient, lectureService)
 	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(auth.MampfParams{}, conn, rep), LockSystem: webdav.NewMemLS()}
 	go func(submissionsRep admin.SubmissionRepository) {
 		log.Printf("Server started")

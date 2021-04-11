@@ -9,7 +9,7 @@ require (
 	github.com/go-playground/validator/v10 v10.4.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/uuid v1.1.2
-	github.com/henrixapp/mampf-rpc/grpc v0.0.0-20210315145953-50087d177fd0
+	github.com/henrixapp/mampf-rpc/grpc v0.0.0-20210408075848-64567cc99799
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/minio/minio-go/v7 v7.0.10
 	github.com/ugorji/go v1.2.4 // indirect
