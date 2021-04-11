@@ -34,7 +34,7 @@ type Submission struct {
 
 	db.BaseObject
 
-	SubmissionsFiles map[string]SubmissionsFile `gorm:"-", json:"-"`
+	SubmissionsFiles map[string]SubmissionsFile `gorm:"-" json:"-"`
 }
 
 func (s Submission) NameWithId() string {

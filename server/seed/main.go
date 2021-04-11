@@ -29,11 +29,11 @@ func main() {
 	lectureService := pb.NewMaMpfLectureServiceClient(conn)
 	db := initializeDB()
 	submissionRep := admin.NewSubmissionRepositoryGorm(db, &minio.Client{}, lectureService)
-	assId, err := submissionRep.CreateAssignment(admin.Assignment{LectureID: 27, MediumID: 51, Title: "Ters Übung", Deadline: time.Now().Add(time.Hour * 5), AcceptedFileType: ".pdf", MaxFileCount: 5}, 1)
+	assId, err := submissionRep.CreateAssignment(admin.Assignment{LectureID: 2, MediumID: 51, Title: "Ters Übung", Deadline: time.Now().Add(time.Hour * 5), AcceptedFileType: ".pdf", MaxFileCount: 5}, 1)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	tutid, err := submissionRep.CreateTutorial(admin.Tutorial{Title: "Tutorial 1", LectureID: 27}, 1)
+	tutid, err := submissionRep.CreateTutorial(admin.Tutorial{Title: "Tutorial 1", LectureID: 2}, 1)
 	if err != nil {
 		log.Fatalln(err)
 	}
