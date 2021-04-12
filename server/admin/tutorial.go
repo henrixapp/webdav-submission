@@ -15,5 +15,5 @@ type Tutorial struct {
 //Tutor is the permission to access certain submissions
 type Tutor struct {
 	UserID     int       `json:"userID,omitempty"`
-	TutorialID uuid.UUID `json:"tutorialID,omitempty"`
+	TutorialID uuid.UUID `gorm:"type:uuid" json:"tutorialID,omitempty"`
 }

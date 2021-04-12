@@ -23,9 +23,9 @@ const MAXFILESIZE = 15000000
 
 //Submission is the handin of a group of Students, visible in the Filesystem
 type Submission struct {
-	AssignmentID             uuid.UUID  `json:"assignmentID,omitempty"`
+	AssignmentID             uuid.UUID  `gorm:"type:uuid" json:"assignmentID,omitempty"`
 	Assignment               Assignment `gorm:"foreignKey:AssignmentID" json:"-"`
-	TutorialID               uuid.UUID  `json:"tutorialID,omitempty"`
+	TutorialID               uuid.UUID  `gorm:"type:uuid" json:"tutorialID,omitempty"`
 	Tutorial                 Tutorial   `gorm:"foreignKey:TutorialID" json:"-"`
 	Token                    string     `json:"token,omitempty"`
 	ManuscriptData           string     `json:"-"`
@@ -44,7 +44,7 @@ func (s Submission) NameWithId() string {
 //Submitter is the permission to upload to a submission
 type Submitter struct {
 	UserID       int
-	SubmissionID uuid.UUID
+	SubmissionID uuid.UUID `gorm:"type:uuid"`
 }
 
 //Invitation is the permission to become a submitter.
@@ -52,7 +52,7 @@ type Invitation struct {
 	db.BaseObject
 	InvitedUserID  int       `json:"invitedUserID,omitempty"`
 	InvitingUserID int       `json:"invitingUserID,omitempty"`
-	SubmissionID   uuid.UUID `json:"submissionID,omitempty"`
+	SubmissionID   uuid.UUID `gorm:"type:uuid" json:"submissionID,omitempty"`
 }
 
 //SubmissionsFileInfo mimics a solution/submission part
@@ -73,7 +73,7 @@ type SubmissionsFileInfo struct {
 	Children map[string]SubmissionsFile `gorm:"-"`
 }
 type SubmissionsFile struct {
-	SubmissionID uuid.UUID `gorm:"index:idx_file,unique"`
+	SubmissionID uuid.UUID `gorm:"type:uuid;index:idx_file,unique"`
 	SubmissionsFileInfo
 }
 
