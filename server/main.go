@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	pb "github.com/henrixapp/mampf-rpc/grpc"
@@ -15,7 +17,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"golang.org/x/net/webdav"
 	"google.golang.org/grpc"
-
+	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -52,7 +54,28 @@ func BasicAuth(handler http.HandlerFunc, mampfAuthServiceClient pb.MaMpfAuthServ
 	}
 }
 func initializeDB() *gorm.DB {
-	db, err := gorm.Open(sqlite.Open("test.db"), &gorm.Config{})
+	databaseConnectionType := os.Getenv("DB_CONNECTION_TYPE")
+	if databaseConnectionType == "" {
+		databaseConnectionType = "sqlite3"
+	}
+	databaseConnectionString := os.Getenv("DB_CONNECTION_STRING")
+	log.Println(databaseConnectionString)
+	if databaseConnectionString == "" {
+		databaseConnectionString = "test3.sqlite"
+	}
+	err := fmt.Errorf("initial connect failed")
+	log.Println("Loading db")
+	var db *gorm.DB
+	for err != nil {
+		if databaseConnectionType == "postgres" {
+			db, err = gorm.Open(postgres.Open(databaseConnectionString), &gorm.Config{})
+		}
+		if databaseConnectionType == "sqlite3" {
+			db, err = gorm.Open(sqlite.Open(databaseConnectionString), &gorm.Config{})
+		}
+		time.Sleep(500 * time.Millisecond)
+		log.Println(err)
+	}
 	if err != nil {
 		log.Fatalln("Fatal error while connecting to DB:", err)
 	}
@@ -91,15 +114,15 @@ func initializeMinioClient(minioParams MinioParams) *minio.Client {
 	return minioClient
 }
 func main() {
-	conn, err := grpc.Dial("localhost:9001", grpc.WithInsecure(), grpc.WithBlock())
+	db := initializeDB()
+	conn, err := grpc.Dial(os.Getenv("MAMPF_RPC"), grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer conn.Close()
 	authService := pb.NewMaMpfAuthServiceClient(conn)
 	lectureService := pb.NewMaMpfLectureServiceClient(conn)
-	db := initializeDB()
-	minioClient := initializeMinioClient(MinioParams{Endpoint: "127.0.0.1:9000", AccessKeyID: "apfel", SecretAccessKey: "kuchensahne"})
+	minioClient := initializeMinioClient(MinioParams{Endpoint: os.Getenv("MINIO_HOST"), AccessKeyID: os.Getenv("MINIO_USER"), SecretAccessKey: os.Getenv("MINIO_PASSWORD")})
 	rep := admin.NewSubmissionRepositoryGorm(db, minioClient, lectureService)
 	webd = webdav.Handler{Logger: Log, FileSystem: fs.NewSharedWebDavFS(auth.MampfParams{}, conn, rep), LockSystem: webdav.NewMemLS()}
 	go func(submissionsRep admin.SubmissionRepository) {
