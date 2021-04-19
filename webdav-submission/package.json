@@ -1,0 +1,10 @@
+{
+  "name": "webdav-submission",
+  "version": "1.0.0",
+  "description": "The package containing the api for administration of webdav-submissions",
+  "main": "index.ts",
+  "repository": "https://github.com/henrixapp/webdav-submission.git",
+  "author": "Henrik Reinstädtler",
+  "license": "MIT",
+  "private": true
+}

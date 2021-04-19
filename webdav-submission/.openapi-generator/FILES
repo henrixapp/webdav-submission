@@ -1,0 +1,12 @@
+.gitignore
+src/apis/DefaultApi.ts
+src/apis/index.ts
+src/index.ts
+src/models/Assignment.ts
+src/models/Invitation.ts
+src/models/Submission.ts
+src/models/Tutor.ts
+src/models/Tutorial.ts
+src/models/index.ts
+src/runtime.ts
+tsconfig.json

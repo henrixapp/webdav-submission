@@ -45,7 +45,7 @@ paths:
       - in: path
         name: assignmentID
         schema:
-          type: integer
+          type: string
         required: true
         description: ID of the assignment in question
     get:

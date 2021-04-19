@@ -10,4 +10,5 @@ RUN go build -a -installsuffix cgo -o webdav-submission .
 FROM scratch AS runtime
 ENV GIN_MODE=release
 COPY --from=build /go/src/webdav-submission ./
+COPY rbac.conf ./
 ENTRYPOINT ["./webdav-submission"]

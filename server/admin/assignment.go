@@ -15,9 +15,9 @@ type Assignment struct {
 	//MediumID is the ID of the media the assigment is designed for
 	MediumID int `json:"mediumID,omitempty"`
 	// Title is  a descriptive title of an exercise
-	Title string `json:"deadline,omitempty"`
+	Title string `json:"title,omitempty"`
 	//Deadline is the end timestamp for submissions, editing afterwards might be forbidden
-	Deadline time.Time `json:"title,omitempty"`
+	Deadline time.Time `json:"deadline,omitempty"`
 	//AcceptedFileType is the filetype accepted TODO(henrik): what's about directories
 	AcceptedFileType string `json:"acceptedFileType,omitempty"`
 	//MaxFileCount gives the maximum number of Files
