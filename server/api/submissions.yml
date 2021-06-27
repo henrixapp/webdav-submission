@@ -112,7 +112,7 @@ paths:
       - in: path
         name: tutorialID
         schema:
-          type: integer
+          type: string
         required: true
         description: ID of the tutorial in question
     get:
@@ -130,7 +130,7 @@ paths:
       - in: path
         name: tutorialID
         schema:
-          type: integer
+          type: string
         required: true
         description: ID of the tutorial in question
       - in: path

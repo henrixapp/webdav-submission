@@ -108,21 +108,21 @@ export interface TokenTokenJoinPostRequest {
 }
 
 export interface TutorialsTutorialIDTutorsGetRequest {
-    tutorialID: number;
+    tutorialID: string;
 }
 
 export interface TutorialsTutorialIDTutorsUserIDDeleteRequest {
-    tutorialID: number;
+    tutorialID: string;
     userID: number;
 }
 
 export interface TutorialsTutorialIDTutorsUserIDGetRequest {
-    tutorialID: number;
+    tutorialID: string;
     userID: number;
 }
 
 export interface TutorialsTutorialIDTutorsUserIDPostRequest {
-    tutorialID: number;
+    tutorialID: string;
     userID: number;
 }
 
